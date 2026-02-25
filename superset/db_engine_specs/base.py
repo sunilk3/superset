@@ -1970,6 +1970,22 @@ class BaseEngineSpec:  # pylint: disable=too-many-public-methods
         """
         return []
 
+    @classmethod
+    def get_function_names_for_schema(  # pylint: disable=unused-argument
+        cls,
+        database: Database,
+        schema: str | None = None,
+    ) -> list[str]:
+        """
+        Get function names for a specific schema when supported by the engine.
+        Falls back to the database-level list by default.
+
+        :param database: The database to get functions for
+        :param schema: Optional schema name to scope the functions to
+        :return: A list of function names useable in the database/schema
+        """
+        return cls.get_function_names(database)
+
     @staticmethod
     def pyodbc_rows_to_tuples(data: list[Any]) -> list[tuple[Any, ...]]:
         """

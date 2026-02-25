@@ -34,6 +34,7 @@ import {
 import { Select } from 'src/components';
 import { FormLabel } from 'src/components/Form';
 import Icons from 'src/components/Icons';
+import { useDatabaseFunctionsQuery } from 'src/hooks/apiResources/databaseFunctions';
 import DatabaseSelector, {
   DatabaseObject,
 } from 'src/components/DatabaseSelector';
@@ -187,6 +188,9 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
   const [tableSelectValue, setTableSelectValue] = useState<
     SelectValue | undefined
   >(undefined);
+  const [functionSelectValue, setFunctionSelectValue] = useState<
+    SelectValue | undefined
+  >(undefined);
   const {
     currentData: data,
     isFetching: loadingTables,
@@ -227,6 +231,31 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
     [data, customTableOptionLabelRenderer],
   );
 
+  const {
+    currentData: functionNames,
+    isFetching: loadingFunctions,
+    refetch: refetchFunctions,
+  } = useDatabaseFunctionsQuery({ dbId: database?.id, schema: currentSchema });
+
+  const functionOptions = useMemo(() => {
+    const names = functionNames ?? [];
+    const filtered = names.filter(fn => {
+      if (!currentSchema) return true;
+      const parts = fn.split('.');
+      return parts.length > 1 ? parts[0] === currentSchema : true;
+    });
+    return filtered.map(fn => ({
+      value: fn,
+      label: (
+        <TableLabel title={fn}>
+          <Icons.FunctionX iconSize="m" />
+          {fn}
+        </TableLabel>
+      ),
+      text: fn,
+    }));
+  }, [functionNames, currentSchema]);
+
   useEffect(() => {
     // reset selections
     if (database === undefined) {
@@ -248,6 +277,8 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
         ) || [],
       );
     }
+    // reset function selection when table options change (or on mode)
+    setFunctionSelectValue(undefined);
   }, [tableOptions, tableValue, tableSelectMode]);
 
   const internalTableChange = (
@@ -264,6 +295,10 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
     } else {
       setTableSelectValue(selectedOptions);
     }
+  };
+
+  const internalFunctionChange = (selected?: TableOption | undefined) => {
+    setFunctionSelectValue(selected);
   };
 
   const internalDbChange = (db: DatabaseObject) => {
@@ -348,6 +383,41 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
     return renderSelectRow(select, refreshLabel);
   }
 
+  function renderFunctionSelect() {
+    const disabled = !currentSchema || readOnly;
+
+    const header = <FormLabel>{t('Functions')}</FormLabel>;
+
+    const select = (
+      <Select
+        ariaLabel={t('Select function or type to search functions')}
+        disabled={disabled}
+        filterOption={handleFilterOption}
+        header={header}
+        labelInValue
+        loading={loadingFunctions}
+        name="select-function"
+        onChange={(option: TableOption | TableOption[] | undefined) =>
+          internalFunctionChange(option as TableOption | undefined)
+        }
+        options={functionOptions}
+        placeholder={t('Select function or type to search functions')}
+        showSearch
+        value={functionSelectValue}
+        allowClear
+      />
+    );
+
+    const refreshLabel = !readOnly && (
+      <RefreshLabel
+        onClick={() => refetchFunctions()}
+        tooltipContent={t('Force refresh function list')}
+      />
+    );
+
+    return renderSelectRow(select, refreshLabel);
+  }
+
   return (
     <TableSelectorWrapper>
       <DatabaseSelector
@@ -366,6 +436,7 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
         isDatabaseSelectEnabled={isDatabaseSelectEnabled && !readOnly}
         readOnly={readOnly}
       />
+      {sqlLabMode && !formMode && renderFunctionSelect()}
       {sqlLabMode && !formMode && <div className="divider" />}
       {renderTableSelect()}
     </TableSelectorWrapper>

@@ -20,6 +20,7 @@ import { api } from './queryApi';
 
 export type FetchDataFunctionsQueryParams = {
   dbId?: string | number;
+  schema?: string;
 };
 
 type FunctionNamesResponse = {
@@ -33,10 +34,19 @@ const databaseFunctionApi = api.injectEndpoints({
   endpoints: builder => ({
     databaseFunctions: builder.query<string[], FetchDataFunctionsQueryParams>({
       providesTags: ['DatabaseFunctions'],
-      query: ({ dbId }) => ({
+      query: ({ dbId, schema }) => ({
         endpoint: `/api/v1/database/${dbId}/function_names/`,
+        // Follow the same pattern as the tables API: encode parameters
+        // in the Rison `q=` payload using `schema_name` as the key.
+        urlParams: {
+          ...(schema ? { schema_name: schema } : {}),
+        },
         transformResponse: ({ json }: FunctionNamesResponse) =>
           json.function_names,
+      }),
+      serializeQueryArgs: ({ queryArgs: { dbId, schema } }) => ({
+        dbId,
+        schema,
       }),
     }),
   }),

@@ -176,6 +176,48 @@ class PostgresBaseEngineSpec(BaseEngineSpec):
         return super().fetch_data(cursor, limit)
 
     @classmethod
+    def get_function_names_for_schema(
+        cls,
+        database: "Database",
+        schema: str | None = None,
+    ) -> list[str]:
+        """
+        Return function names scoped to a specific schema when provided.
+
+        Falls back to the database-level implementation when no schema is
+        specified, or when schema-scoped lookup fails.
+        """
+        # If no schema is provided, use the existing database-level behavior.
+        if not schema:
+            return cls.get_function_names(database)
+
+        # Query PostgreSQL catalogs for functions in the given schema.
+        # We scope via `schema` argument on `get_df` so search_path and
+        # permissions are respected.
+        escaped_schema = schema.replace("'", "''")
+        sql = f"""
+SELECT p.proname
+FROM pg_catalog.pg_proc AS p
+JOIN pg_catalog.pg_namespace AS n ON p.pronamespace = n.oid
+WHERE n.nspname = '{escaped_schema}'
+ORDER BY p.proname
+"""
+        try:
+            df = database.get_df(sql, schema=schema)
+        except Exception:  # pragma: no cover  # pylint: disable=broad-except
+            logger.exception(
+                "Failed to fetch function names for schema %s on database %s",
+                schema,
+                database.id,
+            )
+            return cls.get_function_names(database)
+
+        if df is None or df.empty or "proname" not in df.columns:
+            return []
+
+        return sorted({str(name) for name in df["proname"].tolist() if name})
+
+    @classmethod
     def epoch_to_dttm(cls) -> str:
         return "(timestamp 'epoch' + {col} * interval '1 second')"
 

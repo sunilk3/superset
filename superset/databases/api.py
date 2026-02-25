@@ -1961,7 +1961,8 @@ class DatabaseRestApi(BaseSupersetModelRestApi):
         f".function_names",
         log_to_statsd=False,
     )
-    def function_names(self, pk: int) -> Response:
+    @rison(database_tables_query_schema)
+    def function_names(self, pk: int, **kwargs: Any) -> Response:
         """Get function names supported by a database.
         ---
         get:
@@ -1988,9 +1989,29 @@ class DatabaseRestApi(BaseSupersetModelRestApi):
         database = DatabaseDAO.find_by_id(pk)
         if not database:
             return self.response_404()
+
+        # Accept schema either as a plain `?schema=` query param (legacy)
+        # or inside a Rison `q=` payload following the existing tables API
+        # pattern (where the key is `schema_name`). Prefer the Rison value
+        # when present.
+        schema = None
+        try:
+          schema = kwargs.get("rison", {}).get("schema_name")
+        except Exception:
+          schema = None
+        if not schema:
+          schema = request.args.get("schema") or None
+        if schema:
+            function_names = database.db_engine_spec.get_function_names_for_schema(
+                database,
+                schema,
+            )
+        else:
+            function_names = database.function_names
+
         return self.response(
             200,
-            function_names=database.function_names,
+            function_names=function_names,
         )
 
     @expose("/available/", methods=("GET",))
