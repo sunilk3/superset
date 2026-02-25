@@ -317,6 +317,8 @@ const config = {
       // TODO: remove Handlebars alias once Handlebars NPM package has been updated to
       // correctly support webpack import (https://github.com/handlebars-lang/handlebars.js/issues/953)
       handlebars: 'handlebars/dist/handlebars.js',
+      // Resolve currencyformatter.js from root so just-handlebars-helpers (in plugin) can find it
+      'currencyformatter.js': path.resolve(APP_DIR, 'node_modules/currencyformatter.js'),
       /*
       Temporary workaround to prevent Webpack from resolving moment locale
       files, which are unnecessary for this project and causing build warnings.

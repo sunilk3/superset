@@ -35,18 +35,15 @@ RUN apt-get update -qq \
 
 ENV BUILD_CMD=${NPM_BUILD_CMD} \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-# NPM ci first, as to NOT invalidate previous steps except for when package.json changes
-
+# Install frontend deps (npm install --legacy-peer-deps tolerates lock file drift and peer dep conflicts)
 RUN --mount=type=bind,target=/frontend-mem-nag.sh,src=./docker/frontend-mem-nag.sh \
     /frontend-mem-nag.sh
 
 WORKDIR /app/superset-frontend
-RUN --mount=type=bind,target=./package.json,src=./superset-frontend/package.json \
-    --mount=type=bind,target=./package-lock.json,src=./superset-frontend/package-lock.json \
-    npm ci
+COPY superset-frontend /app/superset-frontend
+RUN npm install --legacy-peer-deps
 
 # Runs the webpack build process
-COPY superset-frontend /app/superset-frontend
 RUN npm run ${BUILD_CMD}
 
 # This copies the .po files needed for translation
