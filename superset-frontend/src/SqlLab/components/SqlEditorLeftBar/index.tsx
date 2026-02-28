@@ -256,7 +256,9 @@ const SqlEditorLeftBar = ({
   const editingFunctionName = useMemo(() => {
     const name = queryEditor?.name ?? '';
     const prefix = t('Edit function: %s', 'x').replace('x', '');
-    return name.startsWith(prefix) ? name.slice(prefix.length).trim() : undefined;
+    return name.startsWith(prefix)
+      ? name.slice(prefix.length).trim()
+      : undefined;
   }, [queryEditor?.name]);
 
   const handleFunctionSelectChange = useCallback(

@@ -18,7 +18,7 @@
  */
 
 declare module 'deck.gl' {
-  import { Layer, LayerProps } from '@deck.gl/core';
+  import { Layer, LayerProps } from 'deck.gl/typed';
 
   interface HeatmapLayerProps<T extends object = any> extends LayerProps<T> {
     id?: string;
