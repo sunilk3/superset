@@ -218,6 +218,49 @@ ORDER BY p.proname
         return sorted({str(name) for name in df["proname"].tolist() if name})
 
     @classmethod
+    def get_function_definition(
+        cls,
+        database: "Database",
+        function_name: str,
+        schema: str | None = None,
+    ) -> str | None:
+        """
+        Get the CREATE OR REPLACE FUNCTION definition using pg_get_functiondef.
+        """
+        # Parse schema and function name (function_name may be "schema.func" or "func")
+        schema_name = schema
+        func_name = function_name
+        if "." in function_name and not schema:
+            parts = function_name.split(".", 1)
+            schema_name = parts[0]
+            func_name = parts[1]
+        elif not schema_name:
+            schema_name = "public"
+
+        escaped_schema = schema_name.replace("'", "''")
+        escaped_func = func_name.replace("'", "''")
+
+        # Find function OID and get definition; handle overloaded functions
+        sql = f"""
+SELECT pg_catalog.pg_get_functiondef(p.oid) AS definition
+FROM pg_catalog.pg_proc AS p
+JOIN pg_catalog.pg_namespace AS n ON p.pronamespace = n.oid
+WHERE n.nspname = '{escaped_schema}' AND p.proname = '{escaped_func}'
+LIMIT 1
+"""
+        try:
+            df = database.get_df(sql, schema=schema_name)
+            if df is not None and not df.empty and "definition" in df.columns:
+                return str(df["definition"].iloc[0])
+        except Exception:  # pragma: no cover  # pylint: disable=broad-except
+            logger.exception(
+                "Failed to fetch function definition for %s.%s",
+                schema_name,
+                func_name,
+            )
+        return None
+
+    @classmethod
     def epoch_to_dttm(cls) -> str:
         return "(timestamp 'epoch' + {col} * interval '1 second')"
 

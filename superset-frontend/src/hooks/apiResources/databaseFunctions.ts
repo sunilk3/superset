@@ -23,9 +23,22 @@ export type FetchDataFunctionsQueryParams = {
   schema?: string;
 };
 
+export type FetchFunctionDefinitionParams = {
+  dbId: string | number;
+  functionName: string;
+  schema?: string;
+};
+
 type FunctionNamesResponse = {
   json: {
     function_names: string[];
+  };
+  response: Response;
+};
+
+type FunctionDefinitionResponse = {
+  json: {
+    function_definition: string | null;
   };
   response: Response;
 };
@@ -49,7 +62,24 @@ const databaseFunctionApi = api.injectEndpoints({
         schema,
       }),
     }),
+    databaseFunctionDefinition: builder.query<
+      string | null,
+      FetchFunctionDefinitionParams
+    >({
+      query: ({ dbId, functionName, schema }) => ({
+        endpoint: `/api/v1/database/${dbId}/function_definition/`,
+        urlParams: {
+          function_name: functionName,
+          ...(schema ? { schema_name: schema } : {}),
+        },
+        transformResponse: ({ json }: FunctionDefinitionResponse) =>
+          json.function_definition,
+      }),
+    }),
   }),
 });
 
-export const { useDatabaseFunctionsQuery } = databaseFunctionApi;
+export const {
+  useDatabaseFunctionsQuery,
+  useLazyDatabaseFunctionDefinitionQuery,
+} = databaseFunctionApi;

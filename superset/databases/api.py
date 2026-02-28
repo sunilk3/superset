@@ -78,9 +78,11 @@ from superset.databases.schemas import (
     CSVMetadataUploadFilePostSchema,
     CSVUploadPostSchema,
     database_catalogs_query_schema,
+    database_function_definition_query_schema,
     database_schemas_query_schema,
     database_tables_query_schema,
     DatabaseConnectionSchema,
+    DatabaseFunctionDefinitionResponse,
     DatabaseFunctionNamesResponse,
     DatabasePostSchema,
     DatabasePutSchema,
@@ -155,6 +157,7 @@ class DatabaseRestApi(BaseSupersetModelRestApi):
         "test_connection",
         "related_objects",
         "function_names",
+        "function_definition",
         "available",
         "validate_parameters",
         "validate_sql",
@@ -273,6 +276,7 @@ class DatabaseRestApi(BaseSupersetModelRestApi):
 
     apispec_parameter_schemas = {
         "database_catalogs_query_schema": database_catalogs_query_schema,
+        "database_function_definition_query_schema": database_function_definition_query_schema,
         "database_schemas_query_schema": database_schemas_query_schema,
         "database_tables_query_schema": database_tables_query_schema,
         "get_export_ids_schema": get_export_ids_schema,
@@ -284,6 +288,7 @@ class DatabaseRestApi(BaseSupersetModelRestApi):
         ColumnarUploadPostSchema,
         CSVUploadPostSchema,
         DatabaseConnectionSchema,
+        DatabaseFunctionDefinitionResponse,
         DatabaseFunctionNamesResponse,
         DatabaseSchemaAccessForFileUploadResponse,
         DatabaseRelatedObjectsResponse,
@@ -2012,6 +2017,69 @@ class DatabaseRestApi(BaseSupersetModelRestApi):
         return self.response(
             200,
             function_names=function_names,
+        )
+
+    @expose("/<int:pk>/function_definition/", methods=("GET",))
+    @protect()
+    @safe
+    @statsd_metrics
+    @event_logger.log_this_with_context(
+        action=lambda self, *args, **kwargs: f"{self.__class__.__name__}"
+        f".function_definition",
+        log_to_statsd=False,
+    )
+    @rison(database_function_definition_query_schema)
+    def function_definition(self, pk: int, **kwargs: Any) -> Response:
+        """Get the SQL definition of a database function for viewing/editing.
+        ---
+        get:
+          summary: Get function definition
+          parameters:
+          - in: path
+            name: pk
+            schema:
+              type: integer
+          responses:
+            200:
+              description: Function definition (CREATE OR REPLACE FUNCTION)
+              content:
+                application/json:
+                  schema:
+                    $ref: "#/components/schemas/DatabaseFunctionDefinitionResponse"
+            401:
+              $ref: '#/components/responses/401'
+            404:
+              $ref: '#/components/responses/404'
+            500:
+              $ref: '#/components/responses/500'
+        """
+        database = DatabaseDAO.find_by_id(pk)
+        if not database:
+            return self.response_404()
+
+        try:
+            rison_data = kwargs.get("rison", {}) or {}
+        except Exception:
+            rison_data = {}
+        function_name = rison_data.get("function_name") or request.args.get(
+            "function_name"
+        )
+        schema = rison_data.get("schema_name") or request.args.get("schema")
+
+        if not function_name:
+            return self.response_400(
+                message="function_name is required",
+            )
+
+        function_definition = database.db_engine_spec.get_function_definition(
+            database,
+            function_name,
+            schema,
+        )
+
+        return self.response(
+            200,
+            function_definition=function_definition,
         )
 
     @expose("/available/", methods=("GET",))

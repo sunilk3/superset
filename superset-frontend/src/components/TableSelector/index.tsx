@@ -111,6 +111,8 @@ interface TableSelectorProps {
     catalog?: string | null,
     schema?: string,
   ) => void;
+  onFunctionSelectChange?: (functionName: string) => void;
+  functionValue?: string;
   tableSelectMode?: 'single' | 'multiple';
   customTableOptionLabelRenderer?: (table: Table) => JSX.Element;
 }
@@ -176,6 +178,8 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
   tableSelectMode = 'single',
   tableValue = undefined,
   onTableSelectChange,
+  onFunctionSelectChange,
+  functionValue,
   customTableOptionLabelRenderer,
 }) => {
   const { addSuccessToast } = useToasts();
@@ -235,7 +239,10 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
     currentData: functionNames,
     isFetching: loadingFunctions,
     refetch: refetchFunctions,
-  } = useDatabaseFunctionsQuery({ dbId: database?.id, schema: currentSchema });
+  } = useDatabaseFunctionsQuery(
+    { dbId: database?.id, schema: currentSchema },
+    { skip: !database?.id || !currentSchema },
+  );
 
   const functionOptions = useMemo(() => {
     const names = functionNames ?? [];
@@ -257,11 +264,12 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
   }, [functionNames, currentSchema]);
 
   useEffect(() => {
-    // reset selections
+    // reset selections when database changes
     if (database === undefined) {
       setCurrentCatalog(undefined);
       setCurrentSchema(undefined);
       setTableSelectValue(undefined);
+      setFunctionSelectValue(undefined);
     }
   }, [database, tableSelectMode]);
 
@@ -277,9 +285,18 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
         ) || [],
       );
     }
-    // reset function selection when table options change (or on mode)
-    setFunctionSelectValue(undefined);
   }, [tableOptions, tableValue, tableSelectMode]);
+
+  useEffect(() => {
+    if (functionValue) {
+      const option = functionOptions.find(opt => opt.value === functionValue);
+      setFunctionSelectValue(
+        option ?? { value: functionValue, label: functionValue },
+      );
+    } else {
+      setFunctionSelectValue(undefined);
+    }
+  }, [functionValue, functionOptions]);
 
   const internalTableChange = (
     selectedOptions: TableOption | TableOption[] | undefined,
@@ -299,6 +316,9 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
 
   const internalFunctionChange = (selected?: TableOption | undefined) => {
     setFunctionSelectValue(selected);
+    if (selected?.value) {
+      onFunctionSelectChange?.(selected.value);
+    }
   };
 
   const internalDbChange = (db: DatabaseObject) => {
@@ -319,6 +339,7 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
     }
 
     setCurrentSchema(undefined);
+    setFunctionSelectValue(undefined);
     const value = tableSelectMode === 'single' ? undefined : [];
     setTableSelectValue(value);
   };
@@ -329,6 +350,7 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
       onSchemaChange(schema);
     }
 
+    setFunctionSelectValue(undefined);
     const value = tableSelectMode === 'single' ? undefined : [];
     setTableSelectValue(value);
   };
@@ -397,8 +419,8 @@ const TableSelector: FunctionComponent<TableSelectorProps> = ({
         labelInValue
         loading={loadingFunctions}
         name="select-function"
-        onChange={(option: TableOption | TableOption[] | undefined) =>
-          internalFunctionChange(option as TableOption | undefined)
+        onChange={(value: SelectValue) =>
+          internalFunctionChange(value as TableOption | undefined)
         }
         options={functionOptions}
         placeholder={t('Select function or type to search functions')}

@@ -24,6 +24,7 @@ import { SqlLabRootState, Table } from 'src/SqlLab/types';
 import {
   queryEditorSetDb,
   addTable,
+  addQueryEditor,
   removeTables,
   collapseTable,
   expandTable,
@@ -42,6 +43,7 @@ import { IconTooltip } from 'src/components/IconTooltip';
 import useQueryEditor from 'src/SqlLab/hooks/useQueryEditor';
 import type { DatabaseObject } from 'src/components/DatabaseSelector';
 import { emptyStateComponent } from 'src/components/EmptyState';
+import { useLazyDatabaseFunctionDefinitionQuery } from 'src/hooks/apiResources/databaseFunctions';
 import {
   getItem,
   LocalStorageKeys,
@@ -107,11 +109,17 @@ const SqlEditorLeftBar = ({
     shallowEqual,
   );
   const dispatch = useDispatch();
+  const [fetchFunctionDefinition] = useLazyDatabaseFunctionDefinitionQuery();
   const queryEditor = useQueryEditor(queryEditorId, [
     'dbId',
     'catalog',
     'schema',
+    'queryLimit',
+    'name',
   ]);
+  const defaultQueryLimit = useSelector<SqlLabRootState, number>(
+    state => state.common?.conf?.DEFAULT_SQLLAB_LIMIT ?? 1000,
+  );
 
   const [emptyResultsWithSearch, setEmptyResultsWithSearch] = useState(false);
   const [userSelectedDb, setUserSelected] = useState<DatabaseObject | null>(
@@ -245,6 +253,71 @@ const SqlEditorLeftBar = ({
     dispatch(resetState());
   }, [dispatch]);
 
+  const editingFunctionName = useMemo(() => {
+    const name = queryEditor?.name ?? '';
+    const prefix = t('Edit function: %s', 'x').replace('x', '');
+    return name.startsWith(prefix) ? name.slice(prefix.length).trim() : undefined;
+  }, [queryEditor?.name]);
+
+  const handleFunctionSelectChange = useCallback(
+    async (functionName: string) => {
+      const db = userSelectedDb ?? database;
+      if (!db?.id || !schema) {
+        dispatch(
+          addDangerToast(
+            t(
+              'Please select a database and schema to view function definition',
+            ),
+          ),
+        );
+        return;
+      }
+      try {
+        const result = await fetchFunctionDefinition({
+          dbId: db.id,
+          functionName,
+          schema,
+        }).unwrap();
+        const sql =
+          result ||
+          `-- ${t(
+            'Function definition not available for this database',
+          )}\n-- ${t(
+            'You can still create or alter the function manually',
+          )}\n\n`;
+        dispatch(
+          addQueryEditor({
+            name: t('Edit function: %s', functionName),
+            dbId: db.id,
+            catalog: catalog ?? null,
+            schema,
+            autorun: false,
+            sql,
+            queryLimit: queryEditor?.queryLimit ?? defaultQueryLimit,
+          }),
+        );
+      } catch {
+        dispatch(
+          addDangerToast(
+            t(
+              'Failed to fetch function definition. You may not have permission to view it.',
+            ),
+          ),
+        );
+      }
+    },
+    [
+      userSelectedDb,
+      database,
+      schema,
+      catalog,
+      queryEditor?.queryLimit,
+      defaultQueryLimit,
+      fetchFunctionDefinition,
+      dispatch,
+    ],
+  );
+
   return (
     <LeftBarStyles data-test="sql-editor-left-bar">
       <TableSelectorMultiple
@@ -255,11 +328,13 @@ const SqlEditorLeftBar = ({
         handleError={handleError}
         onDbChange={onDbChange}
         onCatalogChange={handleCatalogChange}
-        catalog={catalog}
         onSchemaChange={handleSchemaChange}
+        onFunctionSelectChange={handleFunctionSelectChange}
+        catalog={catalog}
         schema={schema}
         onTableSelectChange={onTablesChange}
         tableValue={selectedTableNames}
+        functionValue={editingFunctionName}
         sqlLabMode
       />
       <div className="divider" />

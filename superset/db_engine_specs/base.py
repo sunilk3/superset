@@ -1986,6 +1986,25 @@ class BaseEngineSpec:  # pylint: disable=too-many-public-methods
         """
         return cls.get_function_names(database)
 
+    @classmethod
+    def get_function_definition(  # pylint: disable=unused-argument
+        cls,
+        database: Database,
+        function_name: str,
+        schema: str | None = None,
+    ) -> str | None:
+        """
+        Get the SQL definition of a database function for viewing/editing.
+        Returns CREATE OR REPLACE FUNCTION (or equivalent) for the function.
+        Used when opening a function in SQL Lab for editing.
+
+        :param database: The database to get the function from
+        :param function_name: Name of the function (may include schema prefix)
+        :param schema: Optional schema name
+        :return: The function definition SQL or None if not supported
+        """
+        return None
+
     @staticmethod
     def pyodbc_rows_to_tuples(data: list[Any]) -> list[tuple[Any, ...]]:
         """

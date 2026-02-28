@@ -78,6 +78,15 @@ database_tables_query_schema = {
     "required": ["schema_name"],
 }
 
+database_function_definition_query_schema = {
+    "type": "object",
+    "properties": {
+        "schema_name": {"type": "string"},
+        "function_name": {"type": "string"},
+    },
+    "required": ["function_name"],
+}
+
 database_name_description = "A database name to identify this connection."
 port_description = "Port number for the database connection."
 cache_timeout_description = (
@@ -789,6 +798,10 @@ class DatabaseRelatedObjectsResponse(Schema):
 
 class DatabaseFunctionNamesResponse(Schema):
     function_names = fields.List(fields.String())
+
+
+class DatabaseFunctionDefinitionResponse(Schema):
+    function_definition = fields.String(allow_none=True)
 
 
 class ImportV1DatabaseExtraSchema(Schema):
